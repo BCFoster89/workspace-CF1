@@ -57,11 +57,38 @@ import cadquery as cq
 result = cq.Workplane("XY").box(30, 20, 10).edges().fillet(2)
 """
 
+CADQUERY_MODIFY_PROMPT = """You are an expert CadQuery programmer. You have existing CadQuery code that creates a 3D model. The user wants to modify this model.
 
-def text_to_cadquery(description: str) -> str:
+Rules:
+1. Keep the import statement: import cadquery as cq
+2. The final result MUST be assigned to a variable called 'result'
+3. Modify the existing code to incorporate the user's requested changes
+4. Keep all previous features unless the user specifically asks to remove them
+5. Only output the Python code, no explanations or markdown
+6. The code should be complete and executable
+
+Current code:
+```python
+{current_code}
+```
+
+User's modification request: {description}
+
+Generate the modified CadQuery code:"""
+
+
+def text_to_cadquery(description: str, previous_code: str = None) -> str:
     """Convert natural language description to CadQuery code using Ollama."""
 
-    prompt = f"{CADQUERY_SYSTEM_PROMPT}\n\nGenerate CadQuery code for: {description}"
+    if previous_code:
+        # Modifying existing model
+        prompt = CADQUERY_MODIFY_PROMPT.format(
+            current_code=previous_code,
+            description=description
+        )
+    else:
+        # Creating new model
+        prompt = f"{CADQUERY_SYSTEM_PROMPT}\n\nGenerate CadQuery code for: {description}"
 
     try:
         response = requests.post(
@@ -141,12 +168,13 @@ def index():
 def generate():
     """
     Generate CAD model from text description.
-    Expects JSON: {"description": "text description of the model"}
+    Expects JSON: {"description": "text description of the model", "previous_code": "optional existing code"}
     Returns JSON: {"success": bool, "code": str, "file_id": str, "error": str}
     """
     try:
         data = request.get_json()
         description = data.get('description', '').strip()
+        previous_code = data.get('previous_code', '').strip() or None
 
         if not description:
             return jsonify({
@@ -154,8 +182,8 @@ def generate():
                 'error': 'No description provided'
             }), 400
 
-        # Convert text to CadQuery code
-        code = text_to_cadquery(description)
+        # Convert text to CadQuery code (with optional previous code for iterative building)
+        code = text_to_cadquery(description, previous_code)
 
         # Execute the code and generate STEP file
         file_id, error = execute_cadquery(code)

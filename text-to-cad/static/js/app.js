@@ -22,6 +22,7 @@ class TextToCADApp {
 
         // State
         this.currentFileId = null;
+        this.currentCode = null;  // Track current CadQuery code for iterative building
         this.conversationHistory = [];
         this.viewer = null;
 
@@ -83,24 +84,34 @@ class TextToCADApp {
         // Add user message to chat
         this.addMessage('user', message);
 
-        // Show loading
-        this.showLoading('Generating your 3D model...');
+        // Show loading - indicate if we're modifying existing model
+        if (this.currentCode) {
+            this.showLoading('Modifying your 3D model...');
+        } else {
+            this.showLoading('Generating your 3D model...');
+        }
 
         try {
-            // Call generate API
+            // Call generate API with previous code for iterative building
+            const requestBody = { description: message };
+            if (this.currentCode) {
+                requestBody.previous_code = this.currentCode;
+            }
+
             const response = await fetch(`${this.apiBase}/api/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ description: message })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
 
             if (data.success) {
-                // Update code panel
+                // Update code panel and store current code for next iteration
                 this.updateCodePanel(data.code);
+                this.currentCode = data.code;
 
                 // Store file ID
                 this.currentFileId = data.file_id;
@@ -113,7 +124,10 @@ class TextToCADApp {
                 await this.viewer.loadSTEP(`${this.apiBase}/api/step/${data.file_id}`);
 
                 // Add success message
-                this.addMessage('assistant', 'Model generated successfully! You can rotate the view by dragging, zoom with scroll, and download the STEP file using the button above.');
+                const successMsg = this.currentCode ?
+                    'Model updated! Continue describing changes or click "Clear" to start fresh.' :
+                    'Model generated! You can now describe modifications to build on this model.';
+                this.addMessage('assistant', successMsg);
 
             } else {
                 // Show error
@@ -154,13 +168,15 @@ class TextToCADApp {
             const data = await response.json();
 
             if (data.success) {
+                // Update current code to the manually modified version
+                this.currentCode = code;
                 this.currentFileId = data.file_id;
                 this.downloadBtn.disabled = false;
 
                 this.showLoading('Loading updated model...');
                 await this.viewer.loadSTEP(`${this.apiBase}/api/step/${data.file_id}`);
 
-                this.addMessage('assistant', 'Model updated successfully from modified code!');
+                this.addMessage('assistant', 'Model updated from modified code! Future changes will build on this version.');
             } else {
                 this.addMessage('error', data.error || 'Failed to execute code');
             }
@@ -246,8 +262,9 @@ class TextToCADApp {
             this.chatMessages.appendChild(welcome);
         }
 
-        // Clear conversation history
+        // Clear conversation history and current model code
         this.conversationHistory = [];
+        this.currentCode = null;  // Reset for new model
 
         // Reset code panel
         this.generatedCode.textContent = 'No code generated yet';
@@ -260,6 +277,9 @@ class TextToCADApp {
         // Clear viewer
         this.viewer.clearModel();
         this.viewer.hideCanvas();
+
+        // Add confirmation message
+        this.addMessage('assistant', 'Chat cleared. Ready to create a new model!');
     }
 
     downloadSTEP() {
