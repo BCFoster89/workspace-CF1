@@ -1,15 +1,16 @@
 """
 Text-to-CAD Application Backend
 Converts natural language descriptions to CadQuery code and generates STEP files.
+Uses Ollama for local LLM inference.
 """
 
 import os
 import uuid
 import tempfile
 import traceback
+import requests
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-import anthropic
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -18,18 +19,9 @@ CORS(app)
 STEP_DIR = os.path.join(tempfile.gettempdir(), 'text-to-cad-steps')
 os.makedirs(STEP_DIR, exist_ok=True)
 
-# Initialize Anthropic client
-client = None
-
-def get_anthropic_client():
-    """Get or create Anthropic client."""
-    global client
-    if client is None:
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-        client = anthropic.Anthropic(api_key=api_key)
-    return client
+# Ollama configuration
+OLLAMA_BASE_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')  # Default model, can be changed
 
 
 CADQUERY_SYSTEM_PROMPT = """You are an expert CadQuery programmer. Your task is to convert natural language descriptions of 3D objects into valid CadQuery Python code.
@@ -67,19 +59,35 @@ result = cq.Workplane("XY").box(30, 20, 10).edges().fillet(2)
 
 
 def text_to_cadquery(description: str) -> str:
-    """Convert natural language description to CadQuery code using Claude."""
-    client = get_anthropic_client()
+    """Convert natural language description to CadQuery code using Ollama."""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1024,
-        system=CADQUERY_SYSTEM_PROMPT,
-        messages=[
-            {"role": "user", "content": f"Generate CadQuery code for: {description}"}
-        ]
-    )
+    prompt = f"{CADQUERY_SYSTEM_PROMPT}\n\nGenerate CadQuery code for: {description}"
 
-    code = message.content[0].text
+    try:
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1,  # Low temperature for more deterministic code
+                    "num_predict": 1024
+                }
+            },
+            timeout=120  # 2 minute timeout for generation
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        code = result.get('response', '')
+
+    except requests.exceptions.ConnectionError:
+        raise ValueError(f"Cannot connect to Ollama at {OLLAMA_BASE_URL}. Make sure Ollama is running (ollama serve)")
+    except requests.exceptions.Timeout:
+        raise ValueError("Ollama request timed out. The model may be too slow or not loaded.")
+    except Exception as e:
+        raise ValueError(f"Ollama error: {str(e)}")
 
     # Clean up the code if it has markdown code blocks
     if "```python" in code:
@@ -251,24 +259,51 @@ def chat():
                 'error': 'No messages provided'
             }), 400
 
-        client = get_anthropic_client()
-
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
-            system="""You are a helpful assistant for a Text-to-CAD application.
+        # Build conversation prompt for Ollama
+        system_prompt = """You are a helpful assistant for a Text-to-CAD application.
 You help users create 3D models by understanding their descriptions and suggesting improvements.
 When users describe a 3D object, help them refine the description to be more precise.
 You can also explain CadQuery code and suggest modifications.
-Keep responses concise and helpful.""",
-            messages=messages
+Keep responses concise and helpful."""
+
+        # Format messages into a single prompt
+        prompt = system_prompt + "\n\n"
+        for msg in messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '')
+            if role == 'user':
+                prompt += f"User: {content}\n"
+            else:
+                prompt += f"Assistant: {content}\n"
+        prompt += "Assistant: "
+
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 2048
+                }
+            },
+            timeout=120
         )
+        response.raise_for_status()
+
+        result = response.json()
 
         return jsonify({
             'success': True,
-            'response': response.content[0].text
+            'response': result.get('response', '')
         })
 
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': f'Cannot connect to Ollama at {OLLAMA_BASE_URL}. Make sure Ollama is running.'
+        }), 500
     except Exception as e:
         return jsonify({
             'success': False,
@@ -277,10 +312,10 @@ Keep responses concise and helpful.""",
 
 
 if __name__ == '__main__':
-    # Check for API key
-    if not os.environ.get('ANTHROPIC_API_KEY'):
-        print("Warning: ANTHROPIC_API_KEY not set. Set it before making API calls.")
-        print("Export it with: export ANTHROPIC_API_KEY=your_api_key_here")
-
+    print(f"Using Ollama at: {OLLAMA_BASE_URL}")
+    print(f"Using model: {OLLAMA_MODEL}")
     print(f"STEP files will be saved to: {STEP_DIR}")
+    print("\nMake sure Ollama is running: ollama serve")
+    print(f"And the model is pulled: ollama pull {OLLAMA_MODEL}")
+    print("\nStarting server at http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)

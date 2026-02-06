@@ -1,6 +1,6 @@
 flask>=2.3.0
 flask-cors>=4.0.0
 cadquery>=2.4.0
-anthropic>=0.18.0
+requests>=2.31.0
 python-dotenv>=1.0.0
 gunicorn>=21.0.0
