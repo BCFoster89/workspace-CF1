@@ -200,17 +200,25 @@ class CADViewer {
             // Create geometry
             const geometry = new THREE.BufferGeometry();
 
-            // Set vertex positions
+            // Get position data - ensure it's a Float32Array
+            let positionArray = mesh.attributes.position.array;
+            if (!(positionArray instanceof Float32Array)) {
+                positionArray = new Float32Array(positionArray);
+            }
             geometry.setAttribute(
                 'position',
-                new THREE.Float32BufferAttribute(mesh.attributes.position.array, 3)
+                new THREE.BufferAttribute(positionArray, 3)
             );
 
             // Set normals if available
             if (mesh.attributes.normal) {
+                let normalArray = mesh.attributes.normal.array;
+                if (!(normalArray instanceof Float32Array)) {
+                    normalArray = new Float32Array(normalArray);
+                }
                 geometry.setAttribute(
                     'normal',
-                    new THREE.Float32BufferAttribute(mesh.attributes.normal.array, 3)
+                    new THREE.BufferAttribute(normalArray, 3)
                 );
             } else {
                 geometry.computeVertexNormals();
@@ -218,7 +226,11 @@ class CADViewer {
 
             // Set indices
             if (mesh.index) {
-                geometry.setIndex(new THREE.BufferAttribute(mesh.index.array, 1));
+                let indexArray = mesh.index.array;
+                if (!(indexArray instanceof Uint32Array) && !(indexArray instanceof Uint16Array)) {
+                    indexArray = new Uint32Array(indexArray);
+                }
+                geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
             }
 
             // Create mesh
