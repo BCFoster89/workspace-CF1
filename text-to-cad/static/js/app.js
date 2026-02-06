@@ -168,15 +168,22 @@ class TextToCADApp {
             const data = await response.json();
 
             if (data.success) {
-                // Update current code to the manually modified version
-                this.currentCode = code;
+                // Update current code to the returned (possibly auto-fixed) version
+                const finalCode = data.code || code;
+                this.currentCode = finalCode;
                 this.currentFileId = data.file_id;
                 this.downloadBtn.disabled = false;
 
+                // Update code panel if it was auto-fixed
+                if (data.code && data.code !== code) {
+                    this.updateCodePanel(data.code);
+                    this.addMessage('assistant', 'Code was auto-corrected and model updated! Future changes will build on this version.');
+                } else {
+                    this.addMessage('assistant', 'Model updated from modified code! Future changes will build on this version.');
+                }
+
                 this.showLoading('Loading updated model...');
                 await this.viewer.loadSTEP(`${this.apiBase}/api/step/${data.file_id}`);
-
-                this.addMessage('assistant', 'Model updated from modified code! Future changes will build on this version.');
             } else {
                 this.addMessage('error', data.error || 'Failed to execute code');
             }
