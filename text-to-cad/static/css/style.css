@@ -1,0 +1,440 @@
+/* CSS Variables for theming */
+:root {
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --secondary-color: #64748b;
+    --secondary-hover: #475569;
+    --background-color: #0f172a;
+    --surface-color: #1e293b;
+    --surface-hover: #334155;
+    --border-color: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --success-color: #22c55e;
+    --error-color: #ef4444;
+    --warning-color: #f59e0b;
+    --code-bg: #0d1117;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    line-height: 1.5;
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* App Container */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header */
+.app-header {
+    background-color: var(--surface-color);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.app-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.app-header p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Panel Styles */
+.chat-panel,
+.viewer-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-panel {
+    width: 400px;
+    min-width: 300px;
+    border-right: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+}
+
+.viewer-panel {
+    flex: 1;
+    background-color: var(--background-color);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: var(--surface-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.message {
+    display: flex;
+    flex-direction: column;
+    max-width: 90%;
+}
+
+.message.user {
+    align-self: flex-end;
+}
+
+.message.assistant,
+.message.system {
+    align-self: flex-start;
+}
+
+.message-content {
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.9rem;
+}
+
+.message.user .message-content {
+    background-color: var(--primary-color);
+    border-bottom-right-radius: 0.25rem;
+}
+
+.message.assistant .message-content {
+    background-color: var(--surface-hover);
+    border-bottom-left-radius: 0.25rem;
+}
+
+.message.system .message-content {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.message.system ul {
+    margin-top: 0.5rem;
+    margin-left: 1.25rem;
+}
+
+.message.system li {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.message.error .message-content {
+    background-color: rgba(239, 68, 68, 0.2);
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+}
+
+/* Chat Input */
+.chat-input-container {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem;
+    background-color: var(--surface-color);
+    border-top: 1px solid var(--border-color);
+}
+
+#chat-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    resize: none;
+    font-family: inherit;
+}
+
+#chat-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+#chat-input::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Buttons */
+.btn-primary,
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+    background-color: var(--surface-hover);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--secondary-hover);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#send-btn {
+    padding: 0.75rem 1.25rem;
+}
+
+/* Viewer Controls */
+.viewer-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Viewer Container */
+.viewer-container {
+    flex: 1;
+    position: relative;
+    background-color: #1a1a2e;
+    overflow: hidden;
+}
+
+#viewer-canvas {
+    width: 100%;
+    height: 100%;
+    display: none;
+}
+
+.viewer-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.viewer-placeholder svg {
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.viewer-placeholder p {
+    font-size: 1rem;
+}
+
+/* Code Panel */
+.code-panel {
+    border-top: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.code-header:hover {
+    background-color: var(--surface-hover);
+}
+
+.code-header h3 {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.code-header .chevron {
+    transition: transform 0.2s;
+}
+
+.code-panel.collapsed .chevron {
+    transform: rotate(-90deg);
+}
+
+.code-content {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.code-panel.collapsed .code-content {
+    display: none;
+}
+
+.code-content pre {
+    background-color: var(--code-bg);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 0.75rem;
+}
+
+.code-content code {
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+#run-code {
+    width: 100%;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(15, 23, 42, 0.9);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-overlay p {
+    margin-top: 1rem;
+    color: var(--text-secondary);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+
+    .chat-panel {
+        width: 100%;
+        height: 50%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .viewer-panel {
+        height: 50%;
+    }
+
+    .code-content {
+        max-height: 150px;
+    }
+}
+
+/* Code highlighting classes (basic) */
+.code-keyword {
+    color: #ff79c6;
+}
+
+.code-string {
+    color: #f1fa8c;
+}
+
+.code-number {
+    color: #bd93f9;
+}
+
+.code-comment {
+    color: #6272a4;
+}
+
+.code-function {
+    color: #50fa7b;
+}
