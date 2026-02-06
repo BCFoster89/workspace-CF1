@@ -150,7 +150,7 @@ class CADViewer {
             const fileBuffer = new Uint8Array(buffer);
 
             // Parse STEP file using occt-import-js
-            const result = this.occt.ReadStepFile(fileBuffer, null);
+            const result = this.occt.ReadStepFile(fileBuffer);
 
             if (!result.success) {
                 throw new Error('Failed to parse STEP file');
