@@ -32,24 +32,34 @@ IMPORTANT RULES:
 3. Only output Python code - NO explanations, NO markdown, NO comments
 4. Use millimeters as the default unit unless user specifies inches (convert inches to mm: 1 inch = 25.4mm)
 
-CRITICAL SYNTAX NOTES:
-- Use .edges().fillet(radius) to fillet ALL edges
-- Use .edges("|Z").fillet(radius) to fillet edges parallel to Z axis
-- Use .edges(">Z").fillet(radius) to fillet edges on top face
-- Use .faces(">Z") to select the top face, .faces("<Z") for bottom
-- Use .faces(">X") for front face, .faces("<X") for back face
-- The .fillet() and .chamfer() methods take a SINGLE radius/distance value
-- For holes: .hole(diameter) NOT .hole(radius)
+VALID CadQuery methods (USE ONLY THESE):
+- cq.Workplane("XY") - create workplane (XY, XZ, or YZ)
+- .box(length, width, height) - create box
+- .cylinder(height, radius) - create cylinder
+- .sphere(radius) - create sphere
+- .circle(radius) - sketch circle
+- .rect(width, height) - sketch rectangle
+- .extrude(height) - extrude sketch
+- .hole(diameter) or .hole(diameter, depth) - create hole (DIAMETER not radius!)
+- .cboreHole(hole_diameter, cbore_diameter, cbore_depth) - counterbore hole
+- .cskHole(hole_diameter, csk_diameter, csk_angle) - countersink hole
+- .fillet(radius) - fillet edges
+- .chamfer(length) - chamfer edges
+- .shell(thickness) - hollow out solid
+- .faces(selector) - select faces: ">Z", "<Z", ">X", "<X", ">Y", "<Y"
+- .edges(selector) - select edges: "|Z", "|X", "|Y", ">Z", "<Z"
+- .workplane() - create workplane on selected face
+- .center(x, y) - move center point
+- .cut(shape) - boolean subtract
+- .union(shape) - boolean add
+- .intersect(shape) - boolean intersect
 
-Common operations:
-- Box: cq.Workplane("XY").box(length, width, height)
-- Cylinder: cq.Workplane("XY").cylinder(height, radius)
-- Hole in face: .faces(">Z").workplane().hole(diameter, depth)
-- Through hole: .faces(">Z").workplane().hole(diameter)
-- Fillet all edges: .edges().fillet(radius)
-- Fillet specific edges: .edges("|Z").fillet(radius)
-- Chamfer: .edges().chamfer(distance)
-- Extrude: .circle(radius).extrude(height)
+DO NOT USE these non-existent methods:
+- addWorkplane (use .workplane() instead)
+- createBox, createCylinder (use .box(), .cylinder())
+- addHole, makeHole (use .hole())
+- addFillet, makeFillet (use .fillet())
+- selectFace, selectEdge (use .faces(), .edges())
 
 Example - cube with hole:
 import cadquery as cq
@@ -59,13 +69,13 @@ Example - cylinder:
 import cadquery as cq
 result = cq.Workplane("XY").cylinder(50, 20)
 
-Example - rounded box with fillets on all edges:
+Example - box with fillets on all edges:
 import cadquery as cq
 result = cq.Workplane("XY").box(30, 20, 10).edges().fillet(2)
 
-Example - box with chamfered edges:
+Example - box with hole on side face:
 import cadquery as cq
-result = cq.Workplane("XY").box(20, 20, 10).edges().chamfer(1)
+result = cq.Workplane("XY").box(20, 20, 30).faces(">X").workplane().hole(5, 10)
 """
 
 CADQUERY_MODIFY_PROMPT = """You are an expert CadQuery programmer. Modify the existing code based on the user's request.
@@ -77,11 +87,11 @@ RULES:
 4. Output ONLY Python code - NO explanations, NO markdown
 5. Convert inches to mm if needed (1 inch = 25.4mm)
 
-CRITICAL SYNTAX:
-- Fillet all edges: .edges().fillet(radius)
-- Fillet specific edges: .edges("|Z").fillet(radius) or .edges(">Z").fillet(radius)
-- For holes: .hole(diameter) NOT .hole(radius) - use DIAMETER not radius
-- Select faces: .faces(">Z") for top, .faces("<Z") for bottom, .faces(">X") for front
+VALID methods: .box(), .cylinder(), .sphere(), .hole(), .fillet(), .chamfer(), .shell(), .faces(), .edges(), .workplane(), .extrude(), .cut(), .union()
+DO NOT USE: addWorkplane, createBox, addHole, makeFillet, selectFace (these don't exist!)
+
+Face selectors: ">Z" (top), "<Z" (bottom), ">X" (front), "<X" (back), ">Y" (right), "<Y" (left)
+Edge selectors: "|Z" (parallel to Z), ">Z" (top edges), "<Z" (bottom edges)
 
 Current code:
 ```python
@@ -93,8 +103,9 @@ User wants: {description}
 Output the complete modified Python code:"""
 
 
-# Common CadQuery attribute/method fixes (case sensitivity issues)
+# Common CadQuery attribute/method fixes (case sensitivity and hallucinated methods)
 CADQUERY_FIXES = {
+    # Case sensitivity fixes
     '.length': '.Length',
     '.center': '.Center',
     '.area': '.Area',
@@ -106,28 +117,118 @@ CADQUERY_FIXES = {
     '.xlen': '.xLen',
     '.ylen': '.yLen',
     '.zlen': '.zLen',
+
+    # Workplane case fixes
     'Workplane("xy")': 'Workplane("XY")',
     'Workplane("xz")': 'Workplane("XZ")',
     'Workplane("yz")': 'Workplane("YZ")',
     'workplane("XY")': 'Workplane("XY")',
     'workplane("XZ")': 'Workplane("XZ")',
     'workplane("YZ")': 'Workplane("YZ")',
+
+    # Hallucinated method fixes - common LLM mistakes
+    '.addWorkplane(': '.workplane(',
+    '.AddWorkplane(': '.workplane(',
+    '.add_workplane(': '.workplane(',
+    '.newWorkplane(': '.workplane(',
+    '.createWorkplane(': '.workplane(',
+
+    '.createBox(': '.box(',
+    '.makeBox(': '.box(',
+    '.addBox(': '.box(',
+
+    '.createCylinder(': '.cylinder(',
+    '.makeCylinder(': '.cylinder(',
+    '.addCylinder(': '.cylinder(',
+
+    '.createHole(': '.hole(',
+    '.makeHole(': '.hole(',
+    '.addHole(': '.hole(',
+    '.drillHole(': '.hole(',
+
+    '.createFillet(': '.fillet(',
+    '.makeFillet(': '.fillet(',
+    '.addFillet(': '.fillet(',
+    '.roundEdges(': '.fillet(',
+    '.roundEdge(': '.fillet(',
+
+    '.createChamfer(': '.chamfer(',
+    '.makeChamfer(': '.chamfer(',
+    '.addChamfer(': '.chamfer(',
+    '.bevelEdges(': '.chamfer(',
+
+    '.selectFace(': '.faces(',
+    '.selectFaces(': '.faces(',
+    '.getFace(': '.faces(',
+    '.getFaces(': '.faces(',
+
+    '.selectEdge(': '.edges(',
+    '.selectEdges(': '.edges(',
+    '.getEdge(': '.edges(',
+    '.getEdges(': '.edges(',
+
+    '.createShell(': '.shell(',
+    '.makeShell(': '.shell(',
+    '.hollowOut(': '.shell(',
+
+    '.subtractFrom(': '.cut(',
+    '.subtract(': '.cut(',
+    '.boolean_cut(': '.cut(',
+    '.booleanCut(': '.cut(',
+
+    '.addTo(': '.union(',
+    '.add(': '.union(',
+    '.boolean_union(': '.union(',
+    '.booleanUnion(': '.union(',
+    '.combine(': '.union(',
+    '.merge(': '.union(',
+
+    # Face selector fixes
+    'faces("top")': 'faces(">Z")',
+    'faces("bottom")': 'faces("<Z")',
+    'faces("front")': 'faces(">X")',
+    'faces("back")': 'faces("<X")',
+    'faces("right")': 'faces(">Y")',
+    'faces("left")': 'faces("<Y")',
+    'faces("TOP")': 'faces(">Z")',
+    'faces("BOTTOM")': 'faces("<Z")',
+    'faces("FRONT")': 'faces(">X")',
+    'faces("BACK")': 'faces("<X")',
+
+    # Common typos
+    '.fillett(': '.fillet(',
+    '.filet(': '.fillet(',
+    '.chamf(': '.chamfer(',
+    '.extrud(': '.extrude(',
 }
 
 
 def fix_cadquery_code(code: str) -> str:
     """Apply common fixes to CadQuery code to handle case sensitivity and common mistakes."""
+    import re
+
     fixed_code = code
 
-    # Apply known fixes
+    # Apply known string replacements
     for wrong, correct in CADQUERY_FIXES.items():
         fixed_code = fixed_code.replace(wrong, correct)
 
-    # Fix common pattern issues
-    import re
+    # Fix common regex patterns
 
-    # Fix .fillet() called on single edge without proper syntax
-    # This is a simple heuristic - more complex fixes might need AST parsing
+    # Fix .workplane().workplane() duplication (sometimes LLM adds extra)
+    fixed_code = re.sub(r'\.workplane\(\)\.workplane\(\)', '.workplane()', fixed_code)
+
+    # Fix faces/edges with lowercase selectors
+    fixed_code = re.sub(r'\.faces\(["\']>z["\']\)', '.faces(">Z")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.faces\(["\']<z["\']\)', '.faces("<Z")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.faces\(["\']>x["\']\)', '.faces(">X")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.faces\(["\']<x["\']\)', '.faces("<X")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.faces\(["\']>y["\']\)', '.faces(">Y")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.faces\(["\']<y["\']\)', '.faces("<Y")', fixed_code, flags=re.IGNORECASE)
+
+    fixed_code = re.sub(r'\.edges\(["\']\|z["\']\)', '.edges("|Z")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.edges\(["\']\|x["\']\)', '.edges("|X")', fixed_code, flags=re.IGNORECASE)
+    fixed_code = re.sub(r'\.edges\(["\']\|y["\']\)', '.edges("|Y")', fixed_code, flags=re.IGNORECASE)
 
     return fixed_code
 
@@ -216,21 +317,51 @@ def execute_cadquery(code: str, retry_with_fixes: bool = True) -> tuple[str, str
         return file_id, None, code
 
     except Exception as e:
+        import re
         error_msg = str(e)
 
         # Try to auto-fix common errors and retry
         if retry_with_fixes:
             fixed_code = code
 
-            # Fix specific error patterns
-            if "'Edge' object has no attribute 'length'" in error_msg:
-                fixed_code = fixed_code.replace('.length', '.Length')
-            if "'Edge' object has no attribute 'center'" in error_msg:
-                fixed_code = fixed_code.replace('.center', '.Center')
-            if "'Face' object has no attribute 'area'" in error_msg:
-                fixed_code = fixed_code.replace('.area', '.Area')
-            if "'Solid' object has no attribute 'volume'" in error_msg:
-                fixed_code = fixed_code.replace('.volume', '.Volume')
+            # Fix "has no attribute" errors - extract the bad attribute and try common fixes
+            attr_match = re.search(r"has no attribute '(\w+)'", error_msg)
+            if attr_match:
+                bad_attr = attr_match.group(1)
+
+                # Check if there's a suggestion in the error
+                suggestion_match = re.search(r"Did you mean: '(\w+)'\?", error_msg)
+                if suggestion_match:
+                    correct_attr = suggestion_match.group(1)
+                    fixed_code = fixed_code.replace(f'.{bad_attr}(', f'.{correct_attr}(')
+                    fixed_code = fixed_code.replace(f'.{bad_attr})', f'.{correct_attr})')
+                    fixed_code = fixed_code.replace(f'.{bad_attr} ', f'.{correct_attr} ')
+                else:
+                    # Common attribute fixes without suggestion
+                    common_attr_fixes = {
+                        'length': 'Length',
+                        'center': 'Center',
+                        'area': 'Area',
+                        'volume': 'Volume',
+                        'normal': 'Normal',
+                        'addWorkplane': 'workplane',
+                        'AddWorkplane': 'workplane',
+                        'createBox': 'box',
+                        'makeBox': 'box',
+                        'createHole': 'hole',
+                        'makeHole': 'hole',
+                        'addHole': 'hole',
+                        'createFillet': 'fillet',
+                        'makeFillet': 'fillet',
+                        'addFillet': 'fillet',
+                        'createChamfer': 'chamfer',
+                        'makeChamfer': 'chamfer',
+                        'selectFace': 'faces',
+                        'selectEdge': 'edges',
+                    }
+                    if bad_attr in common_attr_fixes:
+                        correct_attr = common_attr_fixes[bad_attr]
+                        fixed_code = fixed_code.replace(f'.{bad_attr}(', f'.{correct_attr}(')
 
             # If we made changes, retry
             if fixed_code != code:
