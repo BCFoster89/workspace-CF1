@@ -57,6 +57,67 @@
                         </svg>
                     </button>
                 </div>
+
+                <!-- Syntax Reference Panel -->
+                <div class="reference-panel" id="reference-panel">
+                    <div class="reference-header" id="reference-toggle">
+                        <h3>CadQuery Syntax Reference</h3>
+                        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="reference-content" id="reference-content">
+                        <div class="reference-section">
+                            <h4>Basic Shapes</h4>
+                            <ul>
+                                <li><code>box(L, W, H)</code> - rectangular box</li>
+                                <li><code>cylinder(height, radius)</code> - cylinder</li>
+                                <li><code>sphere(radius)</code> - sphere</li>
+                            </ul>
+                        </div>
+                        <div class="reference-section">
+                            <h4>Face Selection</h4>
+                            <ul>
+                                <li><code>.faces("&gt;Z")</code> - top face</li>
+                                <li><code>.faces("&lt;Z")</code> - bottom face</li>
+                                <li><code>.faces("&gt;X")</code> - front face</li>
+                                <li><code>.faces("&lt;X")</code> - back face</li>
+                                <li><code>.faces("&gt;Y")</code> - right face</li>
+                                <li><code>.faces("&lt;Y")</code> - left face</li>
+                            </ul>
+                        </div>
+                        <div class="reference-section">
+                            <h4>Edge Selection</h4>
+                            <ul>
+                                <li><code>.edges()</code> - all edges</li>
+                                <li><code>.edges("|Z")</code> - edges parallel to Z</li>
+                                <li><code>.edges("&gt;Z")</code> - top edges</li>
+                                <li><code>.edges("&lt;Z")</code> - bottom edges</li>
+                            </ul>
+                        </div>
+                        <div class="reference-section">
+                            <h4>Operations</h4>
+                            <ul>
+                                <li><code>.hole(diameter)</code> - through hole</li>
+                                <li><code>.hole(diameter, depth)</code> - blind hole</li>
+                                <li><code>.fillet(radius)</code> - round edges</li>
+                                <li><code>.chamfer(distance)</code> - bevel edges</li>
+                                <li><code>.shell(thickness)</code> - hollow out</li>
+                                <li><code>.extrude(height)</code> - extrude sketch</li>
+                                <li><code>.cut(shape)</code> - subtract shape</li>
+                                <li><code>.union(shape)</code> - add shape</li>
+                            </ul>
+                        </div>
+                        <div class="reference-section">
+                            <h4>Tips</h4>
+                            <ul>
+                                <li>Holes use <strong>diameter</strong>, not radius</li>
+                                <li>Default units are <strong>millimeters</strong></li>
+                                <li>Say "add fillet to all edges" or "fillet the top edges"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Viewer Panel -->
@@ -85,6 +146,22 @@
                         <p>Your 3D model will appear here</p>
                     </div>
                     <canvas id="viewer-canvas"></canvas>
+                </div>
+
+                <!-- Feature List Panel -->
+                <div class="feature-panel" id="feature-panel">
+                    <div class="feature-header" id="feature-toggle">
+                        <h3>Model Features</h3>
+                        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="feature-content" id="feature-content">
+                        <ul id="feature-list">
+                            <li class="no-features">No model created yet</li>
+                        </ul>
+                        <p class="feature-tip">Reference these names when making modifications</p>
+                    </div>
                 </div>
 
                 <!-- Code Panel (collapsible) -->

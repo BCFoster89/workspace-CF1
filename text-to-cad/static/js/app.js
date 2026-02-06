@@ -19,6 +19,11 @@ class TextToCADApp {
         this.codeContent = document.getElementById('code-content');
         this.generatedCode = document.getElementById('generated-code');
         this.runCodeBtn = document.getElementById('run-code');
+        this.referencePanel = document.getElementById('reference-panel');
+        this.referenceToggle = document.getElementById('reference-toggle');
+        this.featurePanel = document.getElementById('feature-panel');
+        this.featureToggle = document.getElementById('feature-toggle');
+        this.featureList = document.getElementById('feature-list');
 
         // State
         this.currentFileId = null;
@@ -69,6 +74,20 @@ class TextToCADApp {
         this.codeToggle.addEventListener('click', () => {
             this.codePanel.classList.toggle('collapsed');
         });
+
+        // Reference panel toggle
+        if (this.referenceToggle) {
+            this.referenceToggle.addEventListener('click', () => {
+                this.referencePanel.classList.toggle('collapsed');
+            });
+        }
+
+        // Feature panel toggle
+        if (this.featureToggle) {
+            this.featureToggle.addEventListener('click', () => {
+                this.featurePanel.classList.toggle('collapsed');
+            });
+        }
 
         // Run modified code
         this.runCodeBtn.addEventListener('click', () => this.runModifiedCode());
@@ -248,6 +267,9 @@ class TextToCADApp {
 
         // Expand code panel if collapsed
         this.codePanel.classList.remove('collapsed');
+
+        // Update feature list
+        this.updateFeatureList(code);
     }
 
     highlightCode() {
@@ -259,6 +281,87 @@ class TextToCADApp {
 
         // For now, just keep it as plain text
         // In production, use Prism.js or highlight.js
+    }
+
+    updateFeatureList(code) {
+        if (!this.featureList) return;
+
+        // Parse code to extract features
+        const features = this.extractFeatures(code);
+
+        // Clear current list
+        this.featureList.innerHTML = '';
+
+        if (features.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'no-features';
+            li.textContent = 'No features detected';
+            this.featureList.appendChild(li);
+            return;
+        }
+
+        // Add each feature
+        features.forEach((feature, index) => {
+            const li = document.createElement('li');
+
+            const icon = document.createElement('span');
+            icon.className = 'feature-icon';
+            icon.textContent = (index + 1).toString();
+
+            const name = document.createElement('span');
+            name.className = 'feature-name';
+            name.textContent = feature.name;
+
+            const details = document.createElement('span');
+            details.className = 'feature-details';
+            details.textContent = feature.details;
+
+            li.appendChild(icon);
+            li.appendChild(name);
+            li.appendChild(details);
+            this.featureList.appendChild(li);
+        });
+
+        // Expand feature panel
+        if (this.featurePanel) {
+            this.featurePanel.classList.remove('collapsed');
+        }
+    }
+
+    extractFeatures(code) {
+        const features = [];
+
+        // Patterns to detect CadQuery operations
+        const patterns = [
+            { regex: /\.box\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/g, name: 'Box', format: (m) => `${m[1]}x${m[2]}x${m[3]}` },
+            { regex: /\.cylinder\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/g, name: 'Cylinder', format: (m) => `h=${m[1]}, r=${m[2]}` },
+            { regex: /\.sphere\s*\(\s*([\d.]+)\s*\)/g, name: 'Sphere', format: (m) => `r=${m[1]}` },
+            { regex: /\.hole\s*\(\s*([\d.]+)\s*\)/g, name: 'Through Hole', format: (m) => `d=${m[1]}` },
+            { regex: /\.hole\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/g, name: 'Blind Hole', format: (m) => `d=${m[1]}, depth=${m[2]}` },
+            { regex: /\.fillet\s*\(\s*([\d.]+)\s*\)/g, name: 'Fillet', format: (m) => `r=${m[1]}` },
+            { regex: /\.chamfer\s*\(\s*([\d.]+)\s*\)/g, name: 'Chamfer', format: (m) => `d=${m[1]}` },
+            { regex: /\.shell\s*\(\s*([\d.]+)\s*\)/g, name: 'Shell', format: (m) => `t=${m[1]}` },
+            { regex: /\.extrude\s*\(\s*([\d.]+)\s*\)/g, name: 'Extrude', format: (m) => `h=${m[1]}` },
+            { regex: /\.circle\s*\(\s*([\d.]+)\s*\)/g, name: 'Circle', format: (m) => `r=${m[1]}` },
+            { regex: /\.rect\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/g, name: 'Rectangle', format: (m) => `${m[1]}x${m[2]}` },
+            { regex: /\.cut\s*\(/g, name: 'Cut', format: () => 'boolean subtract' },
+            { regex: /\.union\s*\(/g, name: 'Union', format: () => 'boolean add' },
+            { regex: /\.cboreHole\s*\(/g, name: 'Counterbore Hole', format: () => '' },
+            { regex: /\.cskHole\s*\(/g, name: 'Countersink Hole', format: () => '' },
+        ];
+
+        for (const pattern of patterns) {
+            let match;
+            const regex = new RegExp(pattern.regex.source, 'g');
+            while ((match = regex.exec(code)) !== null) {
+                features.push({
+                    name: pattern.name,
+                    details: pattern.format(match)
+                });
+            }
+        }
+
+        return features;
     }
 
     clearChat() {
@@ -280,6 +383,11 @@ class TextToCADApp {
         // Disable download
         this.downloadBtn.disabled = true;
         this.currentFileId = null;
+
+        // Clear feature list
+        if (this.featureList) {
+            this.featureList.innerHTML = '<li class="no-features">No model created yet</li>';
+        }
 
         // Clear viewer
         this.viewer.clearModel();

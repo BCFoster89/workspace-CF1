@@ -438,3 +438,192 @@ body {
 .code-function {
     color: #50fa7b;
 }
+
+/* Reference Panel */
+.reference-panel {
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    max-height: 250px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.reference-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    background-color: var(--surface-color);
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.reference-header:hover {
+    background-color: var(--surface-hover);
+}
+
+.reference-header h3 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.reference-header .chevron {
+    transition: transform 0.2s;
+}
+
+.reference-panel.collapsed .chevron {
+    transform: rotate(-90deg);
+}
+
+.reference-content {
+    padding: 0.75rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.reference-panel.collapsed .reference-content {
+    display: none;
+}
+
+.reference-section {
+    margin-bottom: 0.75rem;
+}
+
+.reference-section:last-child {
+    margin-bottom: 0;
+}
+
+.reference-section h4 {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.reference-section ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.reference-section li {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    padding: 0.15rem 0;
+}
+
+.reference-section code {
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.65rem;
+    background-color: var(--surface-color);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    color: var(--success-color);
+}
+
+/* Feature Panel */
+.feature-panel {
+    border-top: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+}
+
+.feature-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.feature-header:hover {
+    background-color: var(--surface-hover);
+}
+
+.feature-header h3 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.feature-header .chevron {
+    transition: transform 0.2s;
+}
+
+.feature-panel.collapsed .chevron {
+    transform: rotate(-90deg);
+}
+
+.feature-content {
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border-color);
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.feature-panel.collapsed .feature-content {
+    display: none;
+}
+
+#feature-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#feature-list li {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+    background-color: var(--background-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#feature-list li.no-features {
+    color: var(--text-secondary);
+    font-style: italic;
+    background: none;
+}
+
+#feature-list .feature-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-color);
+    border-radius: 3px;
+    font-size: 0.6rem;
+    font-weight: bold;
+}
+
+#feature-list .feature-name {
+    color: var(--success-color);
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+}
+
+#feature-list .feature-details {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+}
+
+.feature-tip {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border-color);
+}
