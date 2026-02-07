@@ -203,22 +203,208 @@ CADQUERY_FIXES = {
 }
 
 
-def fix_cadquery_code(code: str) -> str:
-    """Apply common fixes to CadQuery code to handle case sensitivity and common mistakes."""
+# Valid CadQuery methods whitelist for validation
+VALID_CADQUERY_METHODS = {
+    # Workplane creation and navigation
+    'Workplane', 'workplane', 'center', 'moveTo', 'lineTo', 'move', 'line',
+    'vLine', 'hLine', 'vLineTo', 'hLineTo', 'polarLine', 'polarLineTo',
+    'radiusArc', 'tangentArcPoint', 'threePointArc', 'sagittaArc', 'spline',
+    'close', 'offset2D', 'mirrorY', 'mirrorX',
+
+    # 3D Primitives
+    'box', 'cylinder', 'sphere', 'cone', 'torus', 'wedge',
+
+    # 2D Sketches
+    'circle', 'ellipse', 'ellipseArc', 'rect', 'polygon', 'polyline',
+    'slot2D', 'text', 'regularPolygon',
+
+    # 3D Operations
+    'extrude', 'revolve', 'sweep', 'loft', 'twistExtrude',
+
+    # Hole operations
+    'hole', 'cboreHole', 'cskHole', 'tapHole', 'threadedHole', 'pushPoints',
+
+    # Modifiers
+    'fillet', 'chamfer', 'shell', 'split', 'combine',
+
+    # Boolean operations
+    'cut', 'union', 'intersect', 'cutBlind', 'cutThruAll',
+
+    # Selectors
+    'faces', 'edges', 'vertices', 'wires', 'solids', 'shells', 'compounds',
+
+    # Transformations
+    'translate', 'rotate', 'rotateAboutCenter', 'mirror', 'scale',
+    'transformed', 'offset',
+
+    # Other common methods
+    'val', 'vals', 'first', 'last', 'item', 'size', 'all', 'add', 'each',
+    'eachpoint', 'end', 'clean', 'tag', 'copyWorkplane', 'newObject',
+    'findSolid', 'findFace', 'section', 'toPending', 'consolidateWires',
+}
+
+
+def validate_structure(code: str) -> tuple[bool, str, str]:
+    """
+    Layer 1: Validate basic code structure.
+    Returns (is_valid, error_message, fixed_code).
+    """
+    fixed_code = code
+
+    # Check for import statement
+    if 'import cadquery' not in fixed_code and 'from cadquery' not in fixed_code:
+        # Add import at the beginning
+        fixed_code = 'import cadquery as cq\n' + fixed_code
+
+    # Check for result assignment
+    if 'result' not in fixed_code or 'result=' not in fixed_code.replace(' ', '').replace('\n', ''):
+        # Try to find the last workplane chain and assign it to result
+        lines = fixed_code.strip().split('\n')
+        for i in range(len(lines) - 1, -1, -1):
+            line = lines[i].strip()
+            if line and not line.startswith('#') and not line.startswith('import'):
+                if 'cq.Workplane' in line or '.box(' in line or '.cylinder(' in line:
+                    if not line.startswith('result'):
+                        lines[i] = 'result = ' + line
+                    break
+        fixed_code = '\n'.join(lines)
+
+    # Check balanced parentheses
+    paren_count = 0
+    bracket_count = 0
+    brace_count = 0
+    in_string = False
+    string_char = None
+
+    for i, char in enumerate(fixed_code):
+        # Handle string detection
+        if char in '"\'':
+            if not in_string:
+                in_string = True
+                string_char = char
+            elif char == string_char and (i == 0 or fixed_code[i-1] != '\\'):
+                in_string = False
+                string_char = None
+            continue
+
+        if in_string:
+            continue
+
+        if char == '(':
+            paren_count += 1
+        elif char == ')':
+            paren_count -= 1
+        elif char == '[':
+            bracket_count += 1
+        elif char == ']':
+            bracket_count -= 1
+        elif char == '{':
+            brace_count += 1
+        elif char == '}':
+            brace_count -= 1
+
+    # Try to fix unbalanced parentheses
+    if paren_count > 0:
+        # Missing closing parens - add them at end
+        fixed_code = fixed_code.rstrip() + ')' * paren_count
+    elif paren_count < 0:
+        # Extra closing parens - remove from end
+        lines = fixed_code.rstrip().split('\n')
+        last_line = lines[-1]
+        while paren_count < 0 and last_line.endswith(')'):
+            last_line = last_line[:-1]
+            paren_count += 1
+        lines[-1] = last_line
+        fixed_code = '\n'.join(lines)
+
+    return True, None, fixed_code
+
+
+def fix_syntax_errors(code: str) -> str:
+    """
+    Layer 2: Fix common syntax errors including missing dots between method calls.
+    """
     import re
 
     fixed_code = code
 
-    # Apply known string replacements
+    # Fix missing dots: )method( -> ).method(
+    # This handles cases like: .box(10, 10, 10)faces(">Z") -> .box(10, 10, 10).faces(">Z")
+    fixed_code = re.sub(r'\)([a-zA-Z_][a-zA-Z0-9_]*)\(', r').\1(', fixed_code)
+
+    # Fix extra consecutive parentheses: )) where only one is needed
+    # But be careful not to break valid code like nested function calls
+    # Only fix cases like: .method())  ->  .method()
+    fixed_code = re.sub(r'\(\)\)', '()', fixed_code)
+
+    # Fix double dots: .. -> .
+    fixed_code = re.sub(r'\.\.+', '.', fixed_code)
+
+    # Fix spaces before dots in method chains
+    fixed_code = re.sub(r'\s+\.(\w+)\(', r'.\1(', fixed_code)
+
+    # Fix .workplane().workplane() duplication
+    fixed_code = re.sub(r'\.workplane\(\)\.workplane\(\)', '.workplane()', fixed_code)
+
+    # Fix direct method calls on Workplane without dot after constructor
+    # cq.Workplane("XY")box(... -> cq.Workplane("XY").box(...
+    fixed_code = re.sub(r'(cq\.Workplane\([^)]+\))([a-zA-Z_])', r'\1.\2', fixed_code)
+
+    return fixed_code
+
+
+def validate_methods(code: str) -> tuple[bool, list[str], str]:
+    """
+    Layer 3: Validate that all method calls are valid CadQuery methods.
+    Returns (is_valid, list_of_invalid_methods, fixed_code).
+    """
+    import re
+
+    fixed_code = code
+    invalid_methods = []
+
+    # Find all method calls (pattern: .methodName( )
+    method_pattern = r'\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\('
+    methods_found = re.findall(method_pattern, fixed_code)
+
+    for method in methods_found:
+        if method not in VALID_CADQUERY_METHODS:
+            invalid_methods.append(method)
+
+            # Try to find a fix in CADQUERY_FIXES
+            for wrong, correct in CADQUERY_FIXES.items():
+                if f'.{method}(' in wrong:
+                    # Extract the correct method name from the fix
+                    correct_method_match = re.search(r'\.(\w+)\(', correct)
+                    if correct_method_match:
+                        correct_method = correct_method_match.group(1)
+                        fixed_code = re.sub(
+                            rf'\.{re.escape(method)}\s*\(',
+                            f'.{correct_method}(',
+                            fixed_code
+                        )
+                        break
+
+    return len(invalid_methods) == 0, invalid_methods, fixed_code
+
+
+def fix_cadquery_code(code: str) -> str:
+    """Apply comprehensive fixes to CadQuery code."""
+    import re
+
+    fixed_code = code
+
+    # Layer 1: Structure validation
+    _, _, fixed_code = validate_structure(fixed_code)
+
+    # Layer 2: Apply known string replacements (hallucinated methods, case fixes)
     for wrong, correct in CADQUERY_FIXES.items():
         fixed_code = fixed_code.replace(wrong, correct)
 
-    # Fix common regex patterns
+    # Layer 2 continued: Fix syntax errors (missing dots, etc.)
+    fixed_code = fix_syntax_errors(fixed_code)
 
-    # Fix .workplane().workplane() duplication (sometimes LLM adds extra)
-    fixed_code = re.sub(r'\.workplane\(\)\.workplane\(\)', '.workplane()', fixed_code)
-
-    # Fix faces/edges with lowercase selectors
+    # Layer 2: Fix faces/edges with lowercase selectors
     fixed_code = re.sub(r'\.faces\(["\']>z["\']\)', '.faces(">Z")', fixed_code, flags=re.IGNORECASE)
     fixed_code = re.sub(r'\.faces\(["\']<z["\']\)', '.faces("<Z")', fixed_code, flags=re.IGNORECASE)
     fixed_code = re.sub(r'\.faces\(["\']>x["\']\)', '.faces(">X")', fixed_code, flags=re.IGNORECASE)
@@ -229,6 +415,11 @@ def fix_cadquery_code(code: str) -> str:
     fixed_code = re.sub(r'\.edges\(["\']\|z["\']\)', '.edges("|Z")', fixed_code, flags=re.IGNORECASE)
     fixed_code = re.sub(r'\.edges\(["\']\|x["\']\)', '.edges("|X")', fixed_code, flags=re.IGNORECASE)
     fixed_code = re.sub(r'\.edges\(["\']\|y["\']\)', '.edges("|Y")', fixed_code, flags=re.IGNORECASE)
+
+    # Layer 3: Method whitelist validation (logs warnings but doesn't fail)
+    is_valid, invalid_methods, fixed_code = validate_methods(fixed_code)
+    if not is_valid:
+        print(f"Warning: Found potentially invalid methods: {invalid_methods}")
 
     return fixed_code
 
@@ -284,14 +475,16 @@ def text_to_cadquery(description: str, previous_code: str = None) -> str:
     return code
 
 
-def execute_cadquery(code: str, retry_with_fixes: bool = True) -> tuple[str, str, str]:
+def execute_cadquery(code: str, max_retries: int = 3) -> tuple[str, str, str]:
     """
     Execute CadQuery code and save the result as a STEP file.
+    Uses comprehensive validation pipeline with multiple retry attempts.
     Returns (file_id, error_message, final_code).
     """
     import cadquery as cq
+    import re
 
-    # Apply fixes before first attempt
+    # Apply comprehensive fixes before first attempt
     code = fix_cadquery_code(code)
 
     def try_execute(code_to_run):
@@ -304,77 +497,108 @@ def execute_cadquery(code: str, retry_with_fixes: bool = True) -> tuple[str, str
 
         return namespace['result']
 
-    try:
-        result = try_execute(code)
+    def apply_error_fix(code_to_fix: str, error_msg: str) -> str:
+        """Apply fixes based on the specific error encountered."""
+        fixed = code_to_fix
 
-        # Generate unique filename
-        file_id = str(uuid.uuid4())
-        step_path = os.path.join(STEP_DIR, f"{file_id}.step")
+        # Fix "has no attribute" errors
+        attr_match = re.search(r"has no attribute '(\w+)'", error_msg)
+        if attr_match:
+            bad_attr = attr_match.group(1)
 
-        # Export to STEP
-        cq.exporters.export(result, step_path)
+            # Check if there's a Python suggestion in the error
+            suggestion_match = re.search(r"Did you mean: '(\w+)'\?", error_msg)
+            if suggestion_match:
+                correct_attr = suggestion_match.group(1)
+                fixed = fixed.replace(f'.{bad_attr}(', f'.{correct_attr}(')
+                fixed = fixed.replace(f'.{bad_attr})', f'.{correct_attr})')
+                fixed = fixed.replace(f'.{bad_attr} ', f'.{correct_attr} ')
+            else:
+                # Common attribute fixes without suggestion
+                common_attr_fixes = {
+                    'length': 'Length',
+                    'center': 'Center',
+                    'area': 'Area',
+                    'volume': 'Volume',
+                    'normal': 'Normal',
+                    'addWorkplane': 'workplane',
+                    'AddWorkplane': 'workplane',
+                    'createBox': 'box',
+                    'makeBox': 'box',
+                    'createHole': 'hole',
+                    'makeHole': 'hole',
+                    'addHole': 'hole',
+                    'createFillet': 'fillet',
+                    'makeFillet': 'fillet',
+                    'addFillet': 'fillet',
+                    'createChamfer': 'chamfer',
+                    'makeChamfer': 'chamfer',
+                    'selectFace': 'faces',
+                    'selectEdge': 'edges',
+                }
+                if bad_attr in common_attr_fixes:
+                    correct_attr = common_attr_fixes[bad_attr]
+                    fixed = fixed.replace(f'.{bad_attr}(', f'.{correct_attr}(')
 
-        return file_id, None, code
+        # Fix "object is not callable" errors - usually missing dot
+        if 'is not callable' in error_msg:
+            # Re-apply syntax fixes with emphasis on missing dots
+            fixed = fix_syntax_errors(fixed)
+            # Also check for pattern like )Workplane -> ).Workplane
+            fixed = re.sub(r'\)(Workplane|cq)', r').\1', fixed)
 
-    except Exception as e:
-        import re
-        error_msg = str(e)
+        # Fix "unexpected EOF" or "SyntaxError" - usually unbalanced parens
+        if 'SyntaxError' in error_msg or 'EOF' in error_msg:
+            _, _, fixed = validate_structure(fixed)
 
-        # Try to auto-fix common errors and retry
-        if retry_with_fixes:
-            fixed_code = code
+        # Fix "name 'result' is not defined" - ensure result assignment
+        if "name 'result' is not defined" in error_msg:
+            lines = fixed.strip().split('\n')
+            for i in range(len(lines) - 1, -1, -1):
+                line = lines[i].strip()
+                if line and not line.startswith('#') and not line.startswith('import'):
+                    if 'cq.' in line or any(m in line for m in ['.box(', '.cylinder(', '.sphere(']):
+                        if not line.startswith('result'):
+                            lines[i] = 'result = ' + line
+                        break
+            fixed = '\n'.join(lines)
 
-            # Fix "has no attribute" errors - extract the bad attribute and try common fixes
-            attr_match = re.search(r"has no attribute '(\w+)'", error_msg)
-            if attr_match:
-                bad_attr = attr_match.group(1)
+        return fixed
 
-                # Check if there's a suggestion in the error
-                suggestion_match = re.search(r"Did you mean: '(\w+)'\?", error_msg)
-                if suggestion_match:
-                    correct_attr = suggestion_match.group(1)
-                    fixed_code = fixed_code.replace(f'.{bad_attr}(', f'.{correct_attr}(')
-                    fixed_code = fixed_code.replace(f'.{bad_attr})', f'.{correct_attr})')
-                    fixed_code = fixed_code.replace(f'.{bad_attr} ', f'.{correct_attr} ')
+    # Attempt execution with retries
+    current_code = code
+    last_error = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            result = try_execute(current_code)
+
+            # Success - generate STEP file
+            file_id = str(uuid.uuid4())
+            step_path = os.path.join(STEP_DIR, f"{file_id}.step")
+            cq.exporters.export(result, step_path)
+
+            return file_id, None, current_code
+
+        except Exception as e:
+            error_msg = str(e)
+            last_error = error_msg
+
+            if attempt < max_retries:
+                # Try to fix based on the error
+                fixed_code = apply_error_fix(current_code, error_msg)
+
+                # Also re-run through general fixes
+                fixed_code = fix_cadquery_code(fixed_code)
+
+                if fixed_code != current_code:
+                    current_code = fixed_code
+                    continue  # Retry with fixed code
                 else:
-                    # Common attribute fixes without suggestion
-                    common_attr_fixes = {
-                        'length': 'Length',
-                        'center': 'Center',
-                        'area': 'Area',
-                        'volume': 'Volume',
-                        'normal': 'Normal',
-                        'addWorkplane': 'workplane',
-                        'AddWorkplane': 'workplane',
-                        'createBox': 'box',
-                        'makeBox': 'box',
-                        'createHole': 'hole',
-                        'makeHole': 'hole',
-                        'addHole': 'hole',
-                        'createFillet': 'fillet',
-                        'makeFillet': 'fillet',
-                        'addFillet': 'fillet',
-                        'createChamfer': 'chamfer',
-                        'makeChamfer': 'chamfer',
-                        'selectFace': 'faces',
-                        'selectEdge': 'edges',
-                    }
-                    if bad_attr in common_attr_fixes:
-                        correct_attr = common_attr_fixes[bad_attr]
-                        fixed_code = fixed_code.replace(f'.{bad_attr}(', f'.{correct_attr}(')
+                    # No fixes applied, no point retrying
+                    break
 
-            # If we made changes, retry
-            if fixed_code != code:
-                try:
-                    result = try_execute(fixed_code)
-                    file_id = str(uuid.uuid4())
-                    step_path = os.path.join(STEP_DIR, f"{file_id}.step")
-                    cq.exporters.export(result, step_path)
-                    return file_id, None, fixed_code
-                except Exception:
-                    pass  # Fall through to return original error
-
-        return None, f"Error executing CadQuery code: {error_msg}\n{traceback.format_exc()}", code
+    return None, f"Error executing CadQuery code: {last_error}\n{traceback.format_exc()}", current_code
 
 
 @app.route('/')
