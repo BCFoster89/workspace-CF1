@@ -24,74 +24,99 @@ OLLAMA_BASE_URL = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')  # Default model, can be changed
 
 
-CADQUERY_SYSTEM_PROMPT = """You are an expert CadQuery programmer. Your task is to convert natural language descriptions of 3D objects into valid CadQuery Python code.
+CADQUERY_SYSTEM_PROMPT = """You are an expert CadQuery programmer. Convert natural language to CadQuery Python code.
 
-IMPORTANT RULES:
-1. Always start with: import cadquery as cq
-2. The final result MUST be assigned to a variable called 'result'
-3. Only output Python code - NO explanations, NO markdown, NO comments
-4. Use millimeters as the default unit unless user specifies inches (convert inches to mm: 1 inch = 25.4mm)
+CRITICAL RULES - FOLLOW EXACTLY:
+1. Start with: import cadquery as cq
+2. Assign final result to: result = ...
+3. Output ONLY Python code - NO markdown, NO comments, NO explanations
+4. Use millimeters (convert inches: 1 inch = 25.4mm)
+5. Method arguments are SEPARATE values, NOT tuples: .box(10, 20, 30) NOT .box((10, 20, 30))
+6. Every method call needs a dot: .box().faces() NOT .box()faces()
 
-VALID CadQuery methods (USE ONLY THESE):
-- cq.Workplane("XY") - create workplane (XY, XZ, or YZ)
-- .box(length, width, height) - create box
-- .cylinder(height, radius) - create cylinder
-- .sphere(radius) - create sphere
-- .circle(radius) - sketch circle
-- .rect(width, height) - sketch rectangle
-- .extrude(height) - extrude sketch
-- .hole(diameter) or .hole(diameter, depth) - create hole (DIAMETER not radius!)
-- .cboreHole(hole_diameter, cbore_diameter, cbore_depth) - counterbore hole
-- .cskHole(hole_diameter, csk_diameter, csk_angle) - countersink hole
-- .fillet(radius) - fillet edges
-- .chamfer(length) - chamfer edges
-- .shell(thickness) - hollow out solid
-- .faces(selector) - select faces: ">Z", "<Z", ">X", "<X", ">Y", "<Y"
-- .edges(selector) - select edges: "|Z", "|X", "|Y", ">Z", "<Z"
-- .workplane() - create workplane on selected face
-- .center(x, y) - move center point
-- .cut(shape) - boolean subtract
-- .union(shape) - boolean add
-- .intersect(shape) - boolean intersect
+COPY THESE EXACT PATTERNS:
 
-DO NOT USE these non-existent methods:
-- addWorkplane (use .workplane() instead)
-- createBox, createCylinder (use .box(), .cylinder())
-- addHole, makeHole (use .hole())
-- addFillet, makeFillet (use .fillet())
-- selectFace, selectEdge (use .faces(), .edges())
-
-Example - cube with hole:
+Example 1 - Simple box:
 import cadquery as cq
-result = cq.Workplane("XY").box(10, 10, 10).faces(">Z").workplane().hole(5)
+result = cq.Workplane("XY").box(30, 20, 10)
 
-Example - cylinder:
+Example 2 - Box with center hole:
+import cadquery as cq
+result = cq.Workplane("XY").box(80, 60, 10).faces(">Z").workplane().hole(22)
+
+Example 3 - Box with filleted vertical edges:
+import cadquery as cq
+result = cq.Workplane("XY").box(30, 30, 5).edges("|Z").fillet(2)
+
+Example 4 - Cylinder:
 import cadquery as cq
 result = cq.Workplane("XY").cylinder(50, 20)
 
-Example - box with fillets on all edges:
+Example 5 - Hollow box (shell):
 import cadquery as cq
-result = cq.Workplane("XY").box(30, 20, 10).edges().fillet(2)
+result = cq.Workplane("XY").box(20, 20, 20).shell(-2)
 
-Example - box with hole on side face:
+Example 6 - Box with 4 corner holes (counterbored):
 import cadquery as cq
-result = cq.Workplane("XY").box(20, 20, 30).faces(">X").workplane().hole(5, 10)
-"""
+result = (
+    cq.Workplane("XY")
+    .box(40, 20, 5)
+    .faces(">Z")
+    .workplane()
+    .rect(35, 15, forConstruction=True)
+    .vertices()
+    .cboreHole(2.4, 4.4, 2.1)
+)
 
-CADQUERY_MODIFY_PROMPT = """You are an expert CadQuery programmer. Modify the existing code based on the user's request.
+Example 7 - Plate with hole on side face:
+import cadquery as cq
+result = cq.Workplane("XY").box(20, 20, 30).faces(">X").workplane().hole(8, 10)
+
+Example 8 - Extruded circle on top of box:
+import cadquery as cq
+result = cq.Workplane("XY").box(20, 20, 5).faces(">Z").workplane().circle(5).extrude(10)
+
+Example 9 - Box with chamfered edges:
+import cadquery as cq
+result = cq.Workplane("XY").box(20, 20, 10).edges(">Z").chamfer(1)
+
+Example 10 - Complete bearing block:
+import cadquery as cq
+result = (
+    cq.Workplane("XY")
+    .box(30, 40, 10)
+    .faces(">Z")
+    .workplane()
+    .hole(22)
+    .faces(">Z")
+    .workplane()
+    .rect(22, 32, forConstruction=True)
+    .vertices()
+    .cboreHole(2.4, 4.4, 2.1)
+    .edges("|Z")
+    .fillet(2)
+)
+
+FACE SELECTORS: ">Z"=top, "<Z"=bottom, ">X"=front, "<X"=back, ">Y"=right, "<Y"=left
+EDGE SELECTORS: "|Z"=vertical, "|X"=parallel to X, ">Z"=top edges
+
+NEVER USE: addWorkplane, createBox, makeHole, addFillet (these don't exist)
+ALWAYS USE: .workplane(), .box(), .hole(), .fillet()"""
+
+CADQUERY_MODIFY_PROMPT = """Modify the CadQuery code based on the user's request.
 
 RULES:
 1. Keep: import cadquery as cq
-2. Result MUST be assigned to 'result'
-3. Keep ALL previous features unless user asks to remove them
-4. Output ONLY Python code - NO explanations, NO markdown
-5. Convert inches to mm if needed (1 inch = 25.4mm)
+2. Assign to: result = ...
+3. Keep ALL previous features unless asked to remove
+4. Output ONLY Python code - NO markdown, NO comments
+5. Arguments are SEPARATE: .box(10, 20, 30) NOT .box((10, 20, 30))
+6. Every method needs a dot: .method1().method2()
 
-VALID methods: .box(), .cylinder(), .sphere(), .hole(), .fillet(), .chamfer(), .shell(), .faces(), .edges(), .workplane(), .extrude(), .cut(), .union()
-DO NOT USE: addWorkplane, createBox, addHole, makeFillet, selectFace (these don't exist!)
+VALID methods: .box(), .cylinder(), .sphere(), .hole(), .cboreHole(), .fillet(), .chamfer(), .shell(), .faces(), .edges(), .vertices(), .workplane(), .circle(), .rect(), .extrude(), .cut(), .union()
 
-Face selectors: ">Z" (top), "<Z" (bottom), ">X" (front), "<X" (back), ">Y" (right), "<Y" (left)
-Edge selectors: "|Z" (parallel to Z), ">Z" (top edges), "<Z" (bottom edges)
+Face selectors: ">Z" (top), "<Z" (bottom), ">X", "<X", ">Y", "<Y"
+Edge selectors: "|Z" (vertical), ">Z" (top edges), "<Z" (bottom edges)
 
 Current code:
 ```python
@@ -328,6 +353,17 @@ def fix_syntax_errors(code: str) -> str:
 
     fixed_code = code
 
+    # Fix tuple arguments: .method((a, b, c)) -> .method(a, b, c)
+    # This handles LLM mistakes like .box((10, 20, 30)) instead of .box(10, 20, 30)
+    # Pattern: .methodname(( followed by comma-separated values and ))
+    tuple_methods = ['box', 'cylinder', 'sphere', 'hole', 'circle', 'rect', 'center',
+                     'translate', 'moveTo', 'lineTo', 'cboreHole', 'cskHole', 'fillet',
+                     'chamfer', 'shell', 'extrude', 'polygon']
+    for method in tuple_methods:
+        # Match .method((val1, val2, ...)) and convert to .method(val1, val2, ...)
+        pattern = rf'\.{method}\(\(([^()]+)\)\)'
+        fixed_code = re.sub(pattern, rf'.{method}(\1)', fixed_code)
+
     # Fix missing dots: )method( -> ).method(
     # This handles cases like: .box(10, 10, 10)faces(">Z") -> .box(10, 10, 10).faces(">Z")
     fixed_code = re.sub(r'\)([a-zA-Z_][a-zA-Z0-9_]*)\(', r').\1(', fixed_code)
@@ -546,6 +582,11 @@ def execute_cadquery(code: str, max_retries: int = 3) -> tuple[str, str, str]:
             fixed = fix_syntax_errors(fixed)
             # Also check for pattern like )Workplane -> ).Workplane
             fixed = re.sub(r'\)(Workplane|cq)', r').\1', fixed)
+
+        # Fix "unsupported operand type(s) for /: 'tuple'" - tuple used instead of args
+        if 'tuple' in error_msg and ('unsupported operand' in error_msg or 'TypeError' in error_msg):
+            # Re-apply syntax fixes which includes tuple unpacking
+            fixed = fix_syntax_errors(fixed)
 
         # Fix "unexpected EOF" or "SyntaxError" - usually unbalanced parens
         if 'SyntaxError' in error_msg or 'EOF' in error_msg:
